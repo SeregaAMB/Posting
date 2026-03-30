@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import os  # Добавили для работы с системными переменными
+from aiohttp import web # Добавили веб-сервер
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.client.default import DefaultBotProperties
@@ -27,7 +29,24 @@ bot = Bot(
 )
 dp = Dispatcher()
 
-# 1. Получение Business ID (пришлет вам в личку)
+# --- Секция Веб-сервера для Render ---
+async def handle(request):
+    return web.Response(text="Bot is running!")
+
+async def start_web_server():
+    app = web.Application()
+    app.router.add_get("/", handle)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    # Render передает порт в переменную PORT. Если её нет, используем 10000
+    port = int(os.environ.get("PORT", 10000))
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
+    print(f"Web server started on port {port}")
+
+# --- Обработчики бота ---
+
+# 1. Получение Business ID
 @dp.business_connection()
 async def handle_business_connection(connection: types.BusinessConnection):
     if connection.is_enabled:
@@ -39,14 +58,12 @@ async def handle_business_connection(connection: types.BusinessConnection):
         await bot.send_message(ADMIN_ID, text)
         print(f"ПОЛУЧЕН BUSINESS_ID: {connection.id}")
 
-# 2. Обработчик рассылки (когда вы присылаете фото с текстом)
+# 2. Обработчик рассылки
 @dp.message(F.photo)
 async def start_broadcast(message: types.Message):
-    # Проверка, что пишет админ
     if message.from_user.id != ADMIN_ID:
         return
 
-    # Проверка, настроен ли Business ID
     if BUSINESS_ID == 'ПОКА_ПУСТО':
         await message.answer("❌ Ошибка: В коде не указан <b>BUSINESS_ID</b>. Подключите бота в настройках Telegram Business и обновите код.")
         return
@@ -61,7 +78,6 @@ async def start_broadcast(message: types.Message):
 
     for chat in TARGET_CHATS:
         try:
-            # Магия: отправка сообщения ОТ ВАШЕГО ЛИЦА
             await bot.send_photo(
                 chat_id=chat,
                 photo=photo_id,
@@ -69,7 +85,7 @@ async def start_broadcast(message: types.Message):
                 business_connection_id=BUSINESS_ID
             )
             success += 1
-            await asyncio.sleep(1) # Задержка, чтобы Telegram не забанил
+            await asyncio.sleep(1) 
         except Exception as e:
             logging.error(f"Ошибка в чате {chat}: {e}")
             errors += 1
@@ -80,17 +96,22 @@ async def start_broadcast(message: types.Message):
         f"❌ Ошибок: {errors}"
     )
 
-# Команда старт для проверки
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     await message.answer("Бот запущен. Пришлите фото с описанием для рассылки.")
 
+# --- Главная функция запуска ---
 async def main():
+    # Запускаем веб-сервер
+    await start_web_server()
+    
     print("Бот запущен и готов к работе!")
+    
+    # Запускаем поллинг (бот начинает слушать сообщения)
     await dp.start_polling(bot)
 
 if __name__ == '__main__':
     try:
         asyncio.run(main())
-    except KeyboardInterrupt:
-        pass
+    except (KeyboardInterrupt, SystemExit):
+        logging.info("Бот остановлен")
