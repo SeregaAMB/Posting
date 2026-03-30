@@ -2,87 +2,95 @@ import asyncio
 import logging
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
 
-# --- НАСТРОЙКИ ---
-API_TOKEN = '8654591106:AAGgcpDGJhp5uv2TvqTIVfU-J0NmSy7EOQo'
-ADMIN_ID = 8451820418  # Ваш личный ID (цифрами)
+# ================= НАСТРОЙКИ =================
+API_TOKEN = '8654591106:AAGgcpDGJhp5uv2TvqTIVfU-J0NmSy7EOQo'  # Получите у @BotFather
+ADMIN_ID = 8451820418          # Ваш числовой ID (узнать можно у @userinfobot)
 
-# Сюда вы вставите ID, который бот напишет вам в консоли после запуска
+# Сюда вставьте ID, который пришлет бот после подключения к бизнесу
 BUSINESS_ID = 'ПОКА_ПУСТО' 
 
-# Список чатов (ID или юзернеймы)
+# Список чатов для рассылки (ID или @юзернеймы)
 TARGET_CHATS = [
-    '@chat_username1', 
-    -100123456789
+    '@chat_one', 
+    -1001234567890
 ]
+# ==============================================
 
-# Настройка логирования
 logging.basicConfig(level=logging.INFO)
 
-bot = Bot(token=API_TOKEN)
+bot = Bot(
+    token=API_TOKEN, 
+    default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+)
 dp = Dispatcher()
 
-# --- 1. ФУНКЦИЯ ДЛЯ ПОЛУЧЕНИЯ BUSINESS_ID ---
-# Как только вы подключите бота в меню "Telegram для бизнеса", 
-# этот код выведет ваш ID в консоль (терминал).
+# 1. Получение Business ID (пришлет вам в личку)
 @dp.business_connection()
 async def handle_business_connection(connection: types.BusinessConnection):
-    print("\n" + "="*50)
-    print(f"🔥 ВАШ BUSINESS_ID: {connection.id}")
-    print("Скопируйте его и вставьте в переменную BUSINESS_ID в начале кода!")
-    print("="*50 + "\n")
+    if connection.is_enabled:
+        text = (
+            f"✅ <b>Бот успешно подключен к бизнесу!</b>\n\n"
+            f"Ваш BUSINESS_ID:\n<code>{connection.id}</code>\n\n"
+            f"Скопируйте его, вставьте в код в переменную BUSINESS_ID и перезапустите бота на Render."
+        )
+        await bot.send_message(ADMIN_ID, text)
+        print(f"ПОЛУЧЕН BUSINESS_ID: {connection.id}")
 
-# --- 2. ОБРАБОТЧИК РАССЫЛКИ ---
+# 2. Обработчик рассылки (когда вы присылаете фото с текстом)
 @dp.message(F.photo)
-async def handle_admin_photo_post(message: types.Message):
-    # Проверка прав
+async def start_broadcast(message: types.Message):
+    # Проверка, что пишет админ
     if message.from_user.id != ADMIN_ID:
         return
 
-    # Проверка, заполнен ли ID
+    # Проверка, настроен ли Business ID
     if BUSINESS_ID == 'ПОКА_ПУСТО':
-        await message.answer("⚠️ Вы не указали BUSINESS_ID в коде! Посмотрите в консоль бота, там должен быть ваш ID.")
+        await message.answer("❌ Ошибка: В коде не указан <b>BUSINESS_ID</b>. Подключите бота в настройках Telegram Business и обновите код.")
         return
 
     photo_id = message.photo[-1].file_id
     caption = message.caption or ""
-
-    confirm_msg = await message.answer("🚀 Начинаю рассылку от вашего имени...")
     
-    success_count = 0
-    error_count = 0
+    status_msg = await message.answer("⏳ Начинаю рассылку от вашего имени...")
+    
+    success = 0
+    errors = 0
 
-    for chat_id in TARGET_CHATS:
+    for chat in TARGET_CHATS:
         try:
-            # Отправка через бизнес-аккаунт
+            # Магия: отправка сообщения ОТ ВАШЕГО ЛИЦА
             await bot.send_photo(
-                chat_id=chat_id,
+                chat_id=chat,
                 photo=photo_id,
                 caption=caption,
                 business_connection_id=BUSINESS_ID
             )
-            success_count += 1
-            await asyncio.sleep(2) # Защита от спам-фильтра
+            success += 1
+            await asyncio.sleep(1) # Задержка, чтобы Telegram не забанил
         except Exception as e:
-            logging.error(f"Ошибка в {chat_id}: {e}")
-            error_count += 1
+            logging.error(f"Ошибка в чате {chat}: {e}")
+            errors += 1
 
-    await confirm_msg.edit_text(
-        f"✅ Рассылка завершена!\n\n"
-        f"Успешно: {success_count}\n"
-        f"Ошибок: {error_count}"
+    await status_msg.edit_text(
+        f"🏁 <b>Рассылка завершена!</b>\n\n"
+        f"✅ Успешно: {success}\n"
+        f"❌ Ошибок: {errors}"
     )
 
+# Команда старт для проверки
 @dp.message(Command("start"))
-async def start_cmd(message: types.Message):
-    await message.answer("Бот готов. Пришли фото с текстом для рассылки.")
+async def cmd_start(message: types.Message):
+    await message.answer("Бот запущен. Пришлите фото с описанием для рассылки.")
 
 async def main():
-    print("Бот запущен. Ожидаю бизнес-соединение...")
+    print("Бот запущен и готов к работе!")
     await dp.start_polling(bot)
 
 if __name__ == '__main__':
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("Бот выключен")
+        pass
