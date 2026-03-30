@@ -12,12 +12,14 @@ API_TOKEN = '8654591106:AAGgcpDGJhp5uv2TvqTIVfU-J0NmSy7EOQo'  # Получите
 ADMIN_ID = 8451820418          # Ваш числовой ID (узнать можно у @userinfobot)
 
 # Сюда вставьте ID, который пришлет бот после подключения к бизнесу
-BUSINESS_ID = 'ПОКА_ПУСТО' 
+BUSINESS_ID = 'TQGOrFXpUUatAgAAjEAZt6KsHa4' 
 
 # Список чатов для рассылки (ID или @юзернеймы)
 TARGET_CHATS = [
-    '@chat_one', 
-    -1001234567890
+    '@GRINCH_USLUGI',
+    '@Depo_Uslugi',
+    -2329813034
+    -1300451954
 ]
 # ==============================================
 
@@ -85,7 +87,7 @@ async def start_broadcast(message: types.Message):
                 business_connection_id=BUSINESS_ID
             )
             success += 1
-            await asyncio.sleep(1) 
+            await asyncio.sleep(600) 
         except Exception as e:
             logging.error(f"Ошибка в чате {chat}: {e}")
             errors += 1
